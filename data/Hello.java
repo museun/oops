@@ -1,5 +1,7 @@
 public class Hello {
     public static void main(String[] args) {
-        System.out.println("fn main() { println!(\"hello world\") }");
+        for (var i = 0; i < 3; i++) {
+            System.out.println("hello world!");
+        }
     }
 }
