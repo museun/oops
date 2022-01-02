@@ -7,11 +7,7 @@ fn main() {
                 data,
                 (
                     // read_u8
-                    (move |d| {
-                        Some([0])
-                            .and_then(|mut buf| std::io::Read::read_exact(d, &mut buf).map(|_| u8::from_be(buf[0])).ok())
-                            .expect("read u8")
-                    }) as fn(&mut std::io::Cursor<Vec<u8>>) -> u8,
+                    (move |d| Some([0]).and_then(|mut buf| std::io::Read::read_exact(d, &mut buf).map(|_| u8::from_be(buf[0])).ok()).expect("read u8")) as fn(&mut std::io::Cursor<Vec<u8>>) -> u8,
                     // read_u16
                     (move |d| {
                         Some([0, 0])
@@ -39,13 +35,7 @@ fn main() {
                 ),
             )
         })
-        .map(|(mut data, (read_u8, read_u16, read_u32, read_i32, read_f32))| {
-            (
-                (read_u32(&mut data), read_u16(&mut data), read_u16(&mut data)),
-                data,
-                (read_u8, read_u16, read_u32, read_i32, read_f32),
-            )
-        })
+        .map(|(mut data, (read_u8, read_u16, read_u32, read_i32, read_f32))| ((read_u32(&mut data), read_u16(&mut data), read_u16(&mut data)), data, (read_u8, read_u16, read_u32, read_i32, read_f32)))
         .map(|((magic, ..), data, read)| Some(|| assert!(magic == 0xCAFEBABE)).map(|f| f()).map(|_| (data, read)).unwrap())
         .map(|(mut data, (read_u8, read_u16, read_u32, read_i32, read_f32))| {
             Some(read_u16(&mut data) as usize - 1)
@@ -73,49 +63,17 @@ fn main() {
                         ),
                         3 => ((None, None, Some(read_i32(&mut data)), None, None, None), <_>::default(), <_>::default()),
                         4 => ((None, None, None, Some(read_f32(&mut data)), None, None), <_>::default(), <_>::default()),
-                        5 => (
-                            (None, None, None, None, Some((read_i32(&mut data), read_i32(&mut data))), None),
-                            <_>::default(),
-                            <_>::default(),
-                        ),
-                        6 => (
-                            (None, None, None, None, None, Some((read_f32(&mut data), read_f32(&mut data)))),
-                            <_>::default(),
-                            <_>::default(),
-                        ),
+                        5 => ((None, None, None, None, Some((read_i32(&mut data), read_i32(&mut data))), None), <_>::default(), <_>::default()),
+                        6 => ((None, None, None, None, None, Some((read_f32(&mut data), read_f32(&mut data)))), <_>::default(), <_>::default()),
                         7 => (<_>::default(), Some(read_u16(&mut data)), <_>::default()),
                         8 => ((None, Some(read_u16(&mut data)), None, None, None, None), <_>::default(), <_>::default()),
-                        9 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None, None, None),
-                        ),
-                        10 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None, None),
-                        ),
-                        11 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (None, None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None),
-                        ),
-                        12 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (None, None, None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None),
-                        ),
-                        15 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (None, None, None, None, Some((read_u8(&mut data), read_u16(&mut data))), None, None),
-                        ),
+                        9 => (<_>::default(), <_>::default(), (Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None, None, None)),
+                        10 => (<_>::default(), <_>::default(), (None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None, None)),
+                        11 => (<_>::default(), <_>::default(), (None, None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None, None)),
+                        12 => (<_>::default(), <_>::default(), (None, None, None, Some((read_u16(&mut data), read_u16(&mut data))), None, None, None)),
+                        15 => (<_>::default(), <_>::default(), (None, None, None, None, Some((read_u8(&mut data), read_u16(&mut data))), None, None)),
                         16 => (<_>::default(), <_>::default(), (None, None, None, None, None, Some(read_u16(&mut data)), None)),
-                        18 => (
-                            <_>::default(),
-                            <_>::default(),
-                            (None, None, None, None, None, None, Some((read_u16(&mut data), read_u16(&mut data)))),
-                        ),
+                        18 => (<_>::default(), <_>::default(), (None, None, None, None, None, None, Some((read_u16(&mut data), read_u16(&mut data))))),
                         e => unimplemented!("unknown tag: {:02}", e),
                     })
                     .take(n)
@@ -256,9 +214,7 @@ fn main() {
                                                 ),
                                             (move |(s, sp), (code, pc), read_1, pop, f| {
                                                 Some(i16::from_be_bytes([read_1(code, pc), read_1(code, pc)]))
-                                                    .and_then(|target| {
-                                                        Some((pop(s, sp).0.unwrap(), pop(s, sp).0.unwrap())).and_then(|(right, left)| f(left, right).then(|| target))
-                                                    })
+                                                    .and_then(|target| Some((pop(s, sp).0.unwrap(), pop(s, sp).0.unwrap())).and_then(|(right, left)| f(left, right).then(|| target)))
                                                     .map(|target| *pc = (*pc as i16 + target - 3) as usize)
                                                     .map(drop)
                                                     .unwrap_or_default()
@@ -377,28 +333,22 @@ fn main() {
                                                                                         e => unreachable!("{:#?}", e),
                                                                                     })
                                                                                     .map(|(name, descriptor)| {
-                                                                                        (
-                                                                                            constants.get(name as usize - 1).unwrap().0 .0.clone().unwrap(),
-                                                                                            constants.get(descriptor as usize - 1).unwrap().0 .0.clone().unwrap(),
-                                                                                        )
+                                                                                        (constants[name as usize - 1].0 .0.clone().unwrap(), constants[descriptor as usize - 1].0 .0.clone().unwrap())
                                                                                     })
                                                                                     .and_then(|(name, descriptor)| {
                                                                                         methods
                                                                                             .iter()
-                                                                                            .find(|(.., n, d)| *n == name && *d == descriptor)
-                                                                                            .map(|method| (Some(method), None))
+                                                                                            .find_map(|method @ (.., n, d)| (*n == name && *d == descriptor).then(|| (Some(method), None)))
                                                                                             .or_else(|| {
                                                                                                 Some((
                                                                                                     None,
                                                                                                     match &*name {
-                                                                                                        "print" => Some(Box::new(move |args| {
-                                                                                                            builtin(args, |i| print!("{}", i), |s| print!("{}", s))
-                                                                                                        })
+                                                                                                        "print" => Some(Box::new(move |args| builtin(args, |i| print!("{}", i), |s| print!("{}", s)))
                                                                                                             as Box<dyn Fn(Vec<(Option<i32>, Option<String>)>)>),
-                                                                                                        "println" => Some(Box::new(move |args| {
-                                                                                                            builtin(args, |i| println!("{}", i), |s| println!("{}", s))
-                                                                                                        })
-                                                                                                            as Box<dyn Fn(Vec<(Option<i32>, Option<String>)>)>),
+                                                                                                        "println" => {
+                                                                                                            Some(Box::new(move |args| builtin(args, |i| println!("{}", i), |s| println!("{}", s)))
+                                                                                                                as Box<dyn Fn(Vec<(Option<i32>, Option<String>)>)>)
+                                                                                                        }
                                                                                                         _ => unimplemented!(),
                                                                                                     },
                                                                                                 ))
